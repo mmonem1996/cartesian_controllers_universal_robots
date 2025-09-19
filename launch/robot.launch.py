@@ -4,6 +4,7 @@
 # \author  Stefan Scherzinger <scherzin@fzi.de>
 # \date    2023/05/30
 #
+# Modified by Mohammed Mohammed
 # -----------------------------------------------------------------------------
 
 from launch import LaunchDescription
@@ -18,13 +19,29 @@ def generate_launch_description():
 
     # Declare arguments
     arg_robot_ip = DeclareLaunchArgument(
-        "robot_ip", default_value="192.168.1.9", description="The robot's IP address"
+        "robot_ip", default_value="192.168.1.4", description="The robot's IP address"
     )
-    declared_args = [arg_robot_ip]
+    
+    arg_use_fake_hardware = DeclareLaunchArgument(
+        "use_fake_hardware", default_value="false", description="Whether to use simulation or real robot"
+    )
+    
+    arg_controller_type = DeclareLaunchArgument(
+        "controller_type", default_value="cartesian_motion", description="Whether to use motion or compliance control", choices=["cartesian_motion", "cartesian_compliance"]
+    )
+
+    arg_use_controller_handles = DeclareLaunchArgument(
+        "use_controller_handles", default_value="false", description="Whether to use interactive markers on Rviz",
+    )
+
+    declared_args = [arg_robot_ip, arg_use_fake_hardware, arg_controller_type, arg_use_controller_handles]
 
     # Robot description
-    description_file = PathJoinSubstitution([this_pkg, "urdf", "setup.urdf.xacro"])
+    description_file = PathJoinSubstitution([this_pkg, "urdf", "setup_jig.urdf.xacro"])
     robot_ip = LaunchConfiguration("robot_ip")
+    use_fake_hardware = LaunchConfiguration("use_fake_hardware")
+    controller_type = LaunchConfiguration("controller_type")
+    use_controller_handles = LaunchConfiguration("use_controller_handles")
     robot_description_content = Command(
         [
             FindExecutable(name="xacro"),
@@ -33,6 +50,9 @@ def generate_launch_description():
             " ",
             "robot_ip:=",
             robot_ip,
+            " ",
+            "use_fake_hardware:=",
+            use_fake_hardware
         ]
     )
     robot_description = {"robot_description": robot_description_content}
@@ -68,18 +88,22 @@ def generate_launch_description():
     # Active controllers
     active_list = [
             "joint_state_broadcaster",
-            "force_torque_sensor_broadcaster",
-            "scaled_joint_trajectory_controller"
+           "cartesian_compliance_controller",
+           #"force_torque_sensor_broadcaster",
+           #"cartesian_motion_controller",
             ]
-    active_spawners = [controller_spawner(controller) for controller in active_list]
+    
 
     # Inactive controllers
     inactive_list = [
-            "cartesian_compliance_controller",
+           # "force_torque_sensor_broadcaster",
+           # "scaled_joint_trajectory_controller",
+           # "cartesian_force_controller",
             "cartesian_force_controller",
-            "cartesian_motion_controller",
-            "motion_control_handle"
+            "motion_control_handle",
             ]
+
+    active_spawners = [controller_spawner(controller) for controller in active_list]
     inactive_spawners = [controller_spawner(controller, "--inactive") for controller in inactive_list]
 
 

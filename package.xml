@@ -20,6 +20,7 @@
   <exec_depend>ur_description</exec_depend>
   <exec_depend>ur_robot_driver</exec_depend>
   <exec_depend>xacro</exec_depend>
+  <exec_depend>ur5_jig_description</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
 
