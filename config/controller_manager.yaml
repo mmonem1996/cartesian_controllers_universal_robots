@@ -1,5 +1,6 @@
 controller_manager:
   ros__parameters:
+    update_rate: 100
     force_torque_sensor_broadcaster:
       type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
 
@@ -52,7 +53,7 @@ scaled_joint_trajectory_controller:
     state_interfaces:
       - position
       - velocity
-    state_publish_rate: 100.0
+    state_publish_rate: 60.0
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
     constraints:
@@ -73,7 +74,7 @@ cartesian_compliance_controller:
     # tool.  When you specify a target_wrench, i.e. some additional forces that
     # your robot should apply to its environment, that target_wrench gets
     # applied in this frame.
-    end_effector_link: "tool0"
+    end_effector_link: "grip_point"
 
     # This is usually the link directly before the first actuated joint.  All
     # controllers will build a kinematic chain from this link up to
@@ -85,7 +86,7 @@ cartesian_compliance_controller:
     # given in this frame.  It's important that this link is located somewhere
     # between end_effector_link and robot_base_link.  If that's not the case,
     # the controllers won't initialize and will emit an error message.
-    ft_sensor_ref_link: "tool0"
+    ft_sensor_ref_link: "sensor_mounting"
 
     # This is the link that the robot feels compliant about. It does not need
     # to coincide with the end_effector_link, but for many use cases, this
@@ -94,7 +95,7 @@ cartesian_compliance_controller:
     # downward pushing forces without generating unwanted offset moments.
     # On the other hand, an application could benefit from yielding a little in
     # the robot's wrist while drawing a line on a surface with a pen.
-    compliance_ref_link: "tool0"
+    compliance_ref_link: "grip_point"
 
     joints:
       - shoulder_pan_joint
@@ -128,7 +129,7 @@ cartesian_compliance_controller:
 
     solver:
         error_scale: 0.5
-        iterations: 3
+        iterations: 10
         publish_state_feedback: True
 
     # For all controllers, these gains are w.r.t. the robot_base_link coordinates.
@@ -197,12 +198,12 @@ cartesian_motion_controller:
         publish_state_feedback: True
 
     pd_gains:
-        trans_x: {p: 20.0}
-        trans_y: {p: 20.0}
-        trans_z: {p: 20.0}
-        rot_x: {p: 5.5}
-        rot_y: {p: 5.5}
-        rot_z: {p: 5.5}
+        trans_x: {p: 40.0, d: 1.0}
+        trans_y: {p: 40.0, d: 1.0}
+        trans_z: {p: 40.0, d: 1.0}
+        rot_x: {p: 10.5, d: 1.0}
+        rot_y: {p: 10.5, d: 1.0}
+        rot_z: {p: 10.5, d: 1.0}
 
 motion_control_handle:
   ros__parameters:

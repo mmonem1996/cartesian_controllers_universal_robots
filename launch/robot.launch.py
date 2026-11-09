@@ -8,34 +8,19 @@
 # -----------------------------------------------------------------------------
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch.actions import TimerAction
 from launch_ros.substitutions import FindPackageShare
 
+def launch_force_sensor(context):
 
-def generate_launch_description():
     this_pkg = FindPackageShare("cartesian_controllers_universal_robots")
-
-    # Declare arguments
-    arg_robot_ip = DeclareLaunchArgument(
-        "robot_ip", default_value="192.168.1.4", description="The robot's IP address"
-    )
     
-    arg_use_fake_hardware = DeclareLaunchArgument(
-        "use_fake_hardware", default_value="false", description="Whether to use simulation or real robot"
-    )
     
-    arg_controller_type = DeclareLaunchArgument(
-        "controller_type", default_value="cartesian_motion", description="Whether to use motion or compliance control", choices=["cartesian_motion", "cartesian_compliance"]
-    )
-
-    arg_use_controller_handles = DeclareLaunchArgument(
-        "use_controller_handles", default_value="false", description="Whether to use interactive markers on Rviz",
-    )
-
-    declared_args = [arg_robot_ip, arg_use_fake_hardware, arg_controller_type, arg_use_controller_handles]
-
+    
+    fake_hardware = LaunchConfiguration("use_fake_hardware").perform(context)
     # Robot description
     description_file = PathJoinSubstitution([this_pkg, "urdf", "setup_jig.urdf.xacro"])
     robot_ip = LaunchConfiguration("robot_ip")
@@ -56,7 +41,7 @@ def generate_launch_description():
         ]
     )
     robot_description = {"robot_description": robot_description_content}
-
+    
     # Robot control
     robot_controllers = PathJoinSubstitution([this_pkg, "config", "controller_manager.yaml"])
     control_node = Node(
@@ -72,11 +57,13 @@ def generate_launch_description():
             ('cartesian_compliance_controller/target_wrench', 'target_wrench'),
             ('cartesian_force_controller/ft_sensor_wrench', 'ft_sensor_wrench'),
             ('cartesian_compliance_controller/ft_sensor_wrench', 'ft_sensor_wrench'),
-            ('force_torque_sensor_broadcaster/wrench', 'ft_sensor_wrench'),
+            # ('force_torque_sensor_broadcaster/wrench', 'ft_sensor_wrench'),
             ],
         parameters=[robot_description, robot_controllers],
     )
-
+    
+    
+    
     def controller_spawner(name, *args):
         return Node(
             package="controller_manager",
@@ -84,16 +71,16 @@ def generate_launch_description():
             output="screen",
             arguments=[name] + [a for a in args],
         )
-
+    
     # Active controllers
     active_list = [
             "joint_state_broadcaster",
-           "cartesian_compliance_controller",
-           #"force_torque_sensor_broadcaster",
-           #"cartesian_motion_controller",
+        #    "cartesian_compliance_controller",
+        #    "force_torque_sensor_broadcaster",
+           "cartesian_motion_controller",
             ]
     
-
+    
     # Inactive controllers
     inactive_list = [
            # "force_torque_sensor_broadcaster",
@@ -102,11 +89,11 @@ def generate_launch_description():
             "cartesian_force_controller",
             "motion_control_handle",
             ]
-
+    
     active_spawners = [controller_spawner(controller) for controller in active_list]
     inactive_spawners = [controller_spawner(controller, "--inactive") for controller in inactive_list]
-
-
+    
+    
     # TF tree
     robot_state_publisher = Node(
         package="robot_state_publisher",
@@ -114,7 +101,7 @@ def generate_launch_description():
         output="both",
         parameters=[robot_description],
     )
-
+    
     # Visualization
     rviz_config = PathJoinSubstitution([this_pkg, "etc", "setup.rviz"])
     rviz = Node(
@@ -124,8 +111,55 @@ def generate_launch_description():
         output="log",
         arguments=["-d", rviz_config]
     )
-
+    
     # Nodes to start
-    nodes = [rviz, control_node, robot_state_publisher] + active_spawners + inactive_spawners
+    nodes = [rviz, control_node,robot_state_publisher] + active_spawners + inactive_spawners
+    actions = []
 
-    return LaunchDescription(declared_args + nodes)
+    if fake_hardware.strip().lower() == "false":
+        actions.append(
+            Node(
+                package="epson_force_sensor_broadcaster",
+                executable="Broadcaster",
+                remappings=[
+                    ('/epson_force_torque_sensor_broadcaster/wrench','ft_sensor_wrench')
+                ],
+                parameters=[{
+                    'cuttoff_fr':20.0
+                }]
+            )
+        )
+
+        actions.append(
+            TimerAction(
+                period=10.0,
+                actions=nodes,
+            )
+        )
+
+    else:
+        actions.extend(nodes)
+
+    return actions
+
+def generate_launch_description():
+    # Declare arguments
+    arg_robot_ip = DeclareLaunchArgument(
+        "robot_ip", default_value="192.168.1.4", description="The robot's IP address"
+    )
+    
+    arg_use_fake_hardware = DeclareLaunchArgument(
+        "use_fake_hardware", default_value="false", description="Whether to use simulation or real robot"
+    )
+    
+    arg_controller_type = DeclareLaunchArgument(
+        "controller_type", default_value="cartesian_motion", description="Whether to use motion or compliance control", choices=["cartesian_motion", "cartesian_compliance"]
+    )
+    
+    arg_use_controller_handles = DeclareLaunchArgument(
+        "use_controller_handles", default_value="false", description="Whether to use interactive markers on Rviz",
+    )
+    
+    declared_args = [arg_robot_ip, arg_use_fake_hardware, arg_controller_type, arg_use_controller_handles]
+
+    return LaunchDescription(declared_args + [OpaqueFunction(function=launch_force_sensor)])
